@@ -1,4 +1,4 @@
-use crate::models::{User, UserInfo};
+use crate::models::user::{User, UserInfo};
 
 pub fn get_user_info(user: &User) -> UserInfo {
     let user_info = UserInfo {

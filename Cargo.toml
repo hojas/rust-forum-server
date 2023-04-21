@@ -7,17 +7,15 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.27.0", features = ["full"] }
-axum = "0.6.15"
-axum-macros = "0.3.7"
+axum = "0.6.16"
 axum-sessions = "0.5.0"
-diesel = { version = "2.0.3", features = ["postgres"] }
+diesel = { version = "2.0.4", features = ["postgres"] }
 diesel_migrations = "2.0.0"
 deadpool-diesel = { version = "0.4.1", features = ["postgres"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-chrono = "0.4.24"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0.160", features = ["derive"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 rand = "0.8.5"
-bcrypt = "0.14"
+bcrypt = "0.14.0"
 dotenvy = "0.15.7"
+check-if-email-exists = "0.9.0"

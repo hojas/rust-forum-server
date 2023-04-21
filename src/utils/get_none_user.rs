@@ -1,5 +1,5 @@
 use std::time::SystemTime;
-use crate::models::User;
+use crate::models::user::User;
 
 pub fn get_none_user() -> User {
      let user = User {

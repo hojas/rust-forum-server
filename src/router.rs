@@ -16,15 +16,21 @@ pub fn routes(pool: Pool) -> Router {
         .route("/", post(controllers::post::create_post))
         .route("/:id/", get(controllers::post::get_post));
 
+    let comment_routes = Router::new()
+        .route("/", post(controllers::comment::create_comment))
+        .route("/", get(controllers::comment::get_comment_list));
+
+    let admin_user_routes = Router::new()
+        .route("/user/", get(controllers::user::get_user_list))
+        .route("/post/", get(controllers::post::get_post_list))
+        .route("/comment/", get(controllers::comment::get_comment_list));
+
     let api_routes = Router::new()
-        // home
         .route("/", get(controllers::home::get_home))
-        // auth
         .nest("/auth/", auth_routes)
-        // TODO: user
-        // TODO: comment
-        // post
-        .nest("/post/", post_routes);
+        .nest("/post/", post_routes)
+        .nest("/comment/", comment_routes)
+        .nest("/admin/", admin_user_routes);
 
     Router::new()
         .nest("/api/", api_routes)
