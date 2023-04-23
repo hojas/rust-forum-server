@@ -14,7 +14,7 @@ diesel_migrations = "2.0.0"
 deadpool-diesel = { version = "0.4.1", features = ["postgres"] }
 serde = { version = "1.0.160", features = ["derive"] }
 tracing = "0.1.37"
-tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 rand = "0.8.5"
 bcrypt = "0.14.0"
 dotenvy = "0.15.7"
