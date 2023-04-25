@@ -23,8 +23,7 @@ pub async fn create_comment(
     }
 
     let conn = pool::get_conn(pool).await?;
-
-    let res = conn
+    let comment = conn
         .interact(|conn| {
             diesel::insert_into(comments::table)
                 .values(new_comment)
@@ -35,7 +34,7 @@ pub async fn create_comment(
         .map_err(response_error::internal_error)?
         .map_err(response_error::internal_error)?;
 
-    Ok(Json(res))
+    Ok(Json(comment))
 }
 
 pub async fn get_comment_list(

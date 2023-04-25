@@ -1,11 +1,12 @@
-use axum::{http::StatusCode, response::Json, extract::{State}};
+use std::collections::HashMap;
+use axum::{http::StatusCode, response::Json, extract::{State, Query}};
 use axum_sessions::extractors::{ReadableSession, WritableSession};
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
 use crate::schema::users;
-use crate::models::{auth::{UserLogin, UserRegister}, user::{User, UserInfo}};
-use crate::utils::{self, response_error};
+use crate::models::{auth::{UserLogin, UserRegister}, user::{User, UserInfo}, response::MessageResponse};
+use crate::utils::{self, response_error, email};
 
 async fn register_user(
     State(pool): State<Pool>,
@@ -21,13 +22,19 @@ async fn register_user(
     let user: User = conn
         .interact(move |conn| {
             diesel::insert_into(users::table)
-                .values(user)
+                .values(&user)
                 .returning(User::as_returning())
                 .get_result(conn)
         })
         .await
         .map_err(response_error::internal_error)?
         .map_err(response_error::internal_error)?;
+
+    let domain = std::env::var("DOMAIN").unwrap();
+    let token = utils::hash_password(&user.email);
+    let verify_email_url = format!("https://{}/auth/verify_email?token={}", domain, token);
+    let content = format!("请打开链接，完成邮箱验证：{}", verify_email_url);
+    email::send_email(user.email.as_str(), "请验证邮箱", &content);
 
     let user_info = utils::get_user_info(&user);
     Ok(Json(user_info))
@@ -75,6 +82,19 @@ pub async fn register(
                 .map_err(response_error::internal_error)?;
             Ok(user)
         }
+    }
+}
+
+pub async fn verify_email(
+    Query(query): Query<HashMap<String, String>>,
+) -> Result<Json<MessageResponse>, (StatusCode, String)> {
+    let token = query.get("token").unwrap_or(&String::from("")).to_string();
+    let email = utils::hash_password(&token);
+    let email_exists = utils::check_email::check(&email).await;
+    if email_exists {
+        Ok(Json(MessageResponse { message: "Email is valid.".to_string() }))
+    } else {
+        Err((StatusCode::BAD_REQUEST, "Email is not valid.".to_string()))
     }
 }
 

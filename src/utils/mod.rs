@@ -6,6 +6,7 @@ pub mod response_error;
 pub mod check_email;
 pub mod user_role;
 pub mod pool;
+pub mod email;
 
 pub use password_bcrypt::hash_password;
 pub use password_bcrypt::verify_password;

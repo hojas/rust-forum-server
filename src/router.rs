@@ -8,6 +8,7 @@ pub fn routes(pool: Pool) -> Router {
     let auth_routes = Router::new()
         .route("/register/", post(controllers::auth::register))
         .route("/login/", post(controllers::auth::login))
+        .route("/verify_email/", get(controllers::auth::verify_email))
         .route("/logout/", get(controllers::auth::logout))
         .route("/user/", get(controllers::auth::get_user));
 
