@@ -1,12 +1,21 @@
 # rust-forum-server
 
-## 功能模块
+A light forum server built with axum, a Rust web framework.
 
-- 用户管理
-- 帖子管理
-- 评论管理
+## Features
 
-## migration
+- User Module
+- Post Module
+- Postscript Module
+- Comment Module
+
+## Development
+
+```shell
+$ cargo run
+```
+
+## Migration
 
 **1. Setup**
 
@@ -17,7 +26,7 @@ $ diesel setup
 **2. Create migration**
 
 ```shell
-$ diesel migration generate create_posts
+$ diesel migration generate create_users
 ```
 
 **3. Write SQL in `up.sql` and `down.sql`**
