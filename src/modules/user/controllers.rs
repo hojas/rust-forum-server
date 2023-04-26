@@ -8,29 +8,29 @@ use crate::schema::users;
 use crate::utils;
 
 use crate::modules::{
-    response::utils as response_utils,
+    response::{
+        models::{MessageResponse, ResponseResult},
+        utils as response_utils,
+    },
     pagination::{
         models::Pagination,
         utils as pagination_utils,
     },
-    user::{
-        models::{User, UserInfo},
-        utils as user_utils,
-    },
 };
-
-pub async fn get_user() -> Json<&'static str> {
-    Json("user")
-}
+use super::{
+    models::{User, UserInfo},
+    utils as user_utils,
+};
 
 pub async fn get_user_list(
     State(pool): State<Pool>,
     Query(query): Query<HashMap<String, String>>,
     session: ReadableSession,
-) -> Result<Json<Pagination<UserInfo>>, (StatusCode, String)> {
+) -> ResponseResult<Pagination<UserInfo>> {
     let is_admin = user_utils::is_admin(session);
     if !is_admin {
-        return Err((StatusCode::NOT_FOUND, "Not Found".to_string()));
+        let message = MessageResponse { message: "not found".to_string() };
+        return Err((StatusCode::NOT_FOUND, Json(message)));
     }
 
     let conn = utils::pool::get_conn(pool).await?;
@@ -39,10 +39,9 @@ pub async fn get_user_list(
         users::table
             .count()
             .get_result(conn)
-            .unwrap()
     ).await
-        .map_err(response_utils::internal_error)
-        .unwrap();
+        .map_err(|e| response_utils::internal_error(e, None))?
+        .map_err(|e| response_utils::internal_error(e, None))?;
 
     let page_info = pagination_utils::get_page_info(query);
     let user_list = conn.interact(move |conn|
@@ -59,6 +58,7 @@ pub async fn get_user_list(
     let user_info_list = user_list.into_iter()
         .map(|user| user_utils::get_user_info(&user))
         .collect();
+
     let paged_list = Pagination {
         total,
         page: page_info.page,

@@ -8,40 +8,47 @@ use crate::schema::posts;
 use crate::utils;
 
 use crate::modules::{
-    response::utils as response_utils,
-    pagination::{models::Pagination, utils as pagination_utils},
-    post::models::{Post, NewPost},
+    response::{
+        models::{MessageResponse, ResponseResult},
+        utils as response_utils,
+    },
+    pagination::{
+        models::Pagination,
+        utils as pagination_utils,
+    },
 };
+use super::models::{Post, NewPost};
 
 pub async fn create_post(
     State(pool): State<Pool>,
     session: ReadableSession,
     Json(new_post): Json<NewPost>,
-) -> Result<Json<Post>, (StatusCode, String)> {
+) -> ResponseResult<Post> {
     let user_email = session.get::<String>("user_email").unwrap();
     if user_email.is_empty() {
-        return Err((StatusCode::NOT_FOUND, "Not Found".to_string()));
+        let message = MessageResponse { message: "not found".to_string() };
+        return Err((StatusCode::NOT_FOUND, Json(message)));
     }
 
     if new_post.title.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "title is empty".to_string()));
+        let message = MessageResponse { message: "title is empty".to_string() };
+        return Err((StatusCode::BAD_REQUEST, Json(message)));
     }
     if new_post.content.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "content is empty".to_string()));
+        let message = MessageResponse { message: "content is empty".to_string() };
+        return Err((StatusCode::BAD_REQUEST, Json(message)));
     }
 
     let conn = utils::pool::get_conn(pool).await?;
 
-    let res = conn
-        .interact(|conn| {
-            diesel::insert_into(posts::table)
-                .values(new_post)
-                .returning(Post::as_returning())
-                .get_result(conn)
-        })
-        .await
-        .map_err(response_utils::internal_error)?
-        .map_err(response_utils::internal_error)?;
+    let res = conn.interact(|conn| {
+        diesel::insert_into(posts::table)
+            .values(new_post)
+            .returning(Post::as_returning())
+            .get_result(conn)
+    }).await
+        .map_err(|e| response_utils::internal_error(e, None))?
+        .map_err(|e| response_utils::internal_error(e, None))?;
 
     Ok(Json(res))
 }
@@ -49,7 +56,7 @@ pub async fn create_post(
 pub async fn get_post(
     State(pool): State<Pool>,
     Path(id): Path<i32>,
-) -> Result<Json<Post>, (StatusCode, String)> {
+) -> ResponseResult<Post> {
     let conn = utils::pool::get_conn(pool).await?;
 
     let post = conn.interact(move |conn|
@@ -67,17 +74,16 @@ pub async fn get_post(
 pub async fn get_post_list(
     State(pool): State<Pool>,
     Query(query): Query<HashMap<String, String>>,
-) -> Result<Json<Pagination<Post>>, (StatusCode, String)> {
+) -> ResponseResult<Pagination<Post>> {
     let conn = utils::pool::get_conn(pool).await?;
 
     let total = conn.interact(|conn|
         posts::table
             .count()
             .get_result(conn)
-            .unwrap()
     ).await
-        .map_err(response_utils::internal_error)
-        .unwrap();
+        .map_err(|e| response_utils::internal_error(e, None))?
+        .map_err(|e| response_utils::internal_error(e, None))?;
 
     let page_info = pagination_utils::get_page_info(query);
 

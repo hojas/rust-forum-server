@@ -8,36 +8,42 @@ use crate::schema::comments;
 use crate::utils;
 
 use crate::modules::{
-    response::utils as response_utils,
-    pagination::{models::Pagination, utils as pagination_utils},
-    comment::models::{Comment, NewComment},
+    response::{
+        models::{MessageResponse, ResponseResult},
+        utils as response_utils,
+    },
+    pagination::{
+        models::Pagination,
+        utils as pagination_utils,
+    },
 };
+use super::models::{Comment, NewComment};
 
 pub async fn create_comment(
     State(pool): State<Pool>,
     session: ReadableSession,
     Json(new_comment): Json<NewComment>,
-) -> Result<Json<Comment>, (StatusCode, String)> {
+) -> ResponseResult<Comment> {
     let user_email = session.get::<String>("user_email").unwrap();
     if user_email.is_empty() {
-        return Err((StatusCode::UNAUTHORIZED, "Unauthorized".to_string()));
+        let message = MessageResponse { message: "not found".to_string() };
+        return Err((StatusCode::NOT_FOUND, Json(message)));
     }
 
     if new_comment.content.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "content is empty".to_string()));
+        let message = MessageResponse { message: "content is empty".to_string() };
+        return Err((StatusCode::BAD_REQUEST, Json(message)));
     }
 
     let conn = utils::pool::get_conn(pool).await?;
-    let comment = conn
-        .interact(|conn| {
-            diesel::insert_into(comments::table)
-                .values(new_comment)
-                .returning(Comment::as_returning())
-                .get_result(conn)
-        })
-        .await
-        .map_err(response_utils::internal_error)?
-        .map_err(response_utils::internal_error)?;
+    let comment = conn.interact(|conn| {
+        diesel::insert_into(comments::table)
+            .values(new_comment)
+            .returning(Comment::as_returning())
+            .get_result(conn)
+    }).await
+        .map_err(|e| response_utils::internal_error(e, None))?
+        .map_err(|e| response_utils::internal_error(e, None))?;
 
     Ok(Json(comment))
 }
@@ -46,7 +52,7 @@ pub async fn get_comment_list(
     State(pool): State<Pool>,
     Path(post_id): Path<i32>,
     Query(query): Query<HashMap<String, String>>,
-) -> Result<Json<Pagination<Comment>>, (StatusCode, String)> {
+) -> ResponseResult<Pagination<Comment>> {
     let conn = utils::pool::get_conn(pool).await?;
 
     let total = conn.interact(move |conn|
@@ -54,10 +60,9 @@ pub async fn get_comment_list(
             .filter(comments::post_id.eq(post_id))
             .count()
             .get_result(conn)
-            .unwrap()
     ).await
-        .map_err(response_utils::internal_error)
-        .unwrap();
+        .map_err(|e| response_utils::internal_error(e, None))?
+        .map_err(|e| response_utils::internal_error(e, None))?;
 
     let page_info = pagination_utils::get_page_info(query);
 
