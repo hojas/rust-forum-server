@@ -38,4 +38,4 @@ $ diesel migration run
 $ diesel migration redo
 ```
 
-参考：https://diesel.rs/guides/getting-started
+Reference: https://diesel.rs/guides/getting-started
