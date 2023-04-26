@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use axum::{Server};
+use axum::Server;
 use dotenvy::dotenv;
 
 mod my_tracing;
@@ -9,8 +9,7 @@ mod session;
 mod router;
 
 pub mod schema;
-pub mod models;
-pub mod controllers;
+pub mod modules;
 pub mod utils;
 
 #[tokio::main]

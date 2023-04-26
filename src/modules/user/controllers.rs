@@ -4,9 +4,20 @@ use axum_sessions::extractors::ReadableSession;
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
-use crate::models::{pagination::Pagination, user::{User, UserInfo}};
 use crate::schema::users;
-use crate::utils::{self, response_error};
+use crate::utils;
+
+use crate::modules::{
+    response::utils as response_utils,
+    pagination::{
+        models::Pagination,
+        utils as pagination_utils,
+    },
+    user::{
+        models::{User, UserInfo},
+        utils as user_utils,
+    },
+};
 
 pub async fn get_user() -> Json<&'static str> {
     Json("user")
@@ -17,12 +28,12 @@ pub async fn get_user_list(
     Query(query): Query<HashMap<String, String>>,
     session: ReadableSession,
 ) -> Result<Json<Pagination<UserInfo>>, (StatusCode, String)> {
-    let is_admin = utils::user_role::is_admin(session);
+    let is_admin = user_utils::is_admin(session);
     if !is_admin {
         return Err((StatusCode::NOT_FOUND, "Not Found".to_string()));
     }
 
-    let conn = pool.get().await.map_err(response_error::internal_error)?;
+    let conn = utils::pool::get_conn(pool).await?;
 
     let total = conn.interact(|conn|
         users::table
@@ -30,11 +41,11 @@ pub async fn get_user_list(
             .get_result(conn)
             .unwrap()
     ).await
-        .map_err(response_error::internal_error)
+        .map_err(response_utils::internal_error)
         .unwrap();
 
-    let page_info = utils::get_page_info(query);
-    let user_list  = conn.interact(move |conn|
+    let page_info = pagination_utils::get_page_info(query);
+    let user_list = conn.interact(move |conn|
         users::table
             .select(User::as_select())
             .order(users::created_at.desc())
@@ -46,7 +57,7 @@ pub async fn get_user_list(
         .unwrap();
 
     let user_info_list = user_list.into_iter()
-        .map(|user| utils::get_user_info(&user))
+        .map(|user| user_utils::get_user_info(&user))
         .collect();
     let paged_list = Pagination {
         total,

@@ -4,9 +4,14 @@ use axum_sessions::extractors::ReadableSession;
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
-use crate::models::{pagination::Pagination, comment::{Comment, NewComment}};
 use crate::schema::comments;
-use crate::utils::{self, response_error, pool};
+use crate::utils;
+
+use crate::modules::{
+    response::utils as response_utils,
+    pagination::{models::Pagination, utils as pagination_utils},
+    comment::models::{Comment, NewComment},
+};
 
 pub async fn create_comment(
     State(pool): State<Pool>,
@@ -22,7 +27,7 @@ pub async fn create_comment(
         return Err((StatusCode::BAD_REQUEST, "content is empty".to_string()));
     }
 
-    let conn = pool::get_conn(pool).await?;
+    let conn = utils::pool::get_conn(pool).await?;
     let comment = conn
         .interact(|conn| {
             diesel::insert_into(comments::table)
@@ -31,8 +36,8 @@ pub async fn create_comment(
                 .get_result(conn)
         })
         .await
-        .map_err(response_error::internal_error)?
-        .map_err(response_error::internal_error)?;
+        .map_err(response_utils::internal_error)?
+        .map_err(response_utils::internal_error)?;
 
     Ok(Json(comment))
 }
@@ -42,7 +47,7 @@ pub async fn get_comment_list(
     Path(post_id): Path<i32>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<Pagination<Comment>>, (StatusCode, String)> {
-    let conn = pool::get_conn(pool).await?;
+    let conn = utils::pool::get_conn(pool).await?;
 
     let total = conn.interact(move |conn|
         comments::table
@@ -51,10 +56,10 @@ pub async fn get_comment_list(
             .get_result(conn)
             .unwrap()
     ).await
-        .map_err(response_error::internal_error)
+        .map_err(response_utils::internal_error)
         .unwrap();
 
-    let page_info = utils::get_page_info(query);
+    let page_info = pagination_utils::get_page_info(query);
 
     let res = conn.interact(move |conn|
         comments::table

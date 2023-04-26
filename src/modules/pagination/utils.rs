@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::models::pagination::PageInfo;
+use super::models::PageInfo;
 
 pub fn get_page_info(query: HashMap<String, String>) -> PageInfo {
     let default_page = String::from("1");

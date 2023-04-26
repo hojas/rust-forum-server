@@ -4,9 +4,14 @@ use axum_sessions::extractors::ReadableSession;
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
-use crate::models::{pagination::Pagination, post::{Post, NewPost}};
 use crate::schema::posts;
-use crate::utils::{self, response_error, pool};
+use crate::utils;
+
+use crate::modules::{
+    response::utils as response_utils,
+    pagination::{models::Pagination, utils as pagination_utils},
+    post::models::{Post, NewPost},
+};
 
 pub async fn create_post(
     State(pool): State<Pool>,
@@ -25,7 +30,7 @@ pub async fn create_post(
         return Err((StatusCode::BAD_REQUEST, "content is empty".to_string()));
     }
 
-    let conn = pool::get_conn(pool).await?;
+    let conn = utils::pool::get_conn(pool).await?;
 
     let res = conn
         .interact(|conn| {
@@ -35,8 +40,8 @@ pub async fn create_post(
                 .get_result(conn)
         })
         .await
-        .map_err(response_error::internal_error)?
-        .map_err(response_error::internal_error)?;
+        .map_err(response_utils::internal_error)?
+        .map_err(response_utils::internal_error)?;
 
     Ok(Json(res))
 }
@@ -45,7 +50,7 @@ pub async fn get_post(
     State(pool): State<Pool>,
     Path(id): Path<i32>,
 ) -> Result<Json<Post>, (StatusCode, String)> {
-    let conn = pool::get_conn(pool).await?;
+    let conn = utils::pool::get_conn(pool).await?;
 
     let post = conn.interact(move |conn|
         posts::table
@@ -53,8 +58,8 @@ pub async fn get_post(
             .filter(posts::id.eq(id))
             .first(conn)
     ).await
-        .map_err(response_error::not_found_error)?
-        .map_err(response_error::not_found_error)?;
+        .map_err(response_utils::not_found_error)?
+        .map_err(response_utils::not_found_error)?;
 
     Ok(Json(post))
 }
@@ -63,7 +68,7 @@ pub async fn get_post_list(
     State(pool): State<Pool>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<Pagination<Post>>, (StatusCode, String)> {
-    let conn = pool::get_conn(pool).await?;
+    let conn = utils::pool::get_conn(pool).await?;
 
     let total = conn.interact(|conn|
         posts::table
@@ -71,10 +76,10 @@ pub async fn get_post_list(
             .get_result(conn)
             .unwrap()
     ).await
-        .map_err(response_error::internal_error)
+        .map_err(response_utils::internal_error)
         .unwrap();
 
-    let page_info = utils::get_page_info(query);
+    let page_info = pagination_utils::get_page_info(query);
 
     let res: Vec<Post> = conn.interact(move |conn|
         posts::table
