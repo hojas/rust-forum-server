@@ -1,17 +1,22 @@
 use std::collections::HashMap;
-use axum::{http::StatusCode, response::Json, extract::{State, Path, Query}};
+use axum::{
+    http::StatusCode,
+    response::Json,
+    extract::{State, Path, Query, rejection::JsonRejection},
+};
 use axum_sessions::extractors::ReadableSession;
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
 use crate::schema::posts;
 use crate::utils;
-
 use crate::modules::{
+    request::utils as request_utils,
     response::{
         models::{MessageResponse, ResponseResult},
         utils as response_utils,
     },
+    session::utils as session_utils,
     pagination::{
         models::Pagination,
         utils as pagination_utils,
@@ -22,14 +27,12 @@ use super::models::{Post, NewPost};
 pub async fn create_post(
     State(pool): State<Pool>,
     session: ReadableSession,
-    Json(new_post): Json<NewPost>,
+    payload: Result<Json<NewPost>, JsonRejection>,
 ) -> ResponseResult<Post> {
-    let user_email = session.get::<String>("user_email").unwrap();
-    if user_email.is_empty() {
-        let message = MessageResponse { message: "not found".to_string() };
-        return Err((StatusCode::NOT_FOUND, Json(message)));
-    }
+    // check if user is logged in
+    session_utils::get_user_email(session)?.0;
 
+    let new_post = request_utils::parse_body(payload)?.0;
     if new_post.title.is_empty() {
         let message = MessageResponse { message: "title is empty".to_string() };
         return Err((StatusCode::BAD_REQUEST, Json(message)));
@@ -40,7 +43,6 @@ pub async fn create_post(
     }
 
     let conn = utils::pool::get_conn(pool).await?;
-
     let res = conn.interact(|conn| {
         diesel::insert_into(posts::table)
             .values(new_post)
@@ -55,8 +57,9 @@ pub async fn create_post(
 
 pub async fn get_post(
     State(pool): State<Pool>,
-    Path(id): Path<i32>,
+    Path(id): Path<String>,
 ) -> ResponseResult<Post> {
+    let id = request_utils::parse_path_param_i32(id).unwrap().0;
     let conn = utils::pool::get_conn(pool).await?;
 
     let post = conn.interact(move |conn|

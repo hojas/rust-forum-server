@@ -1,17 +1,21 @@
 use std::collections::HashMap;
-use axum::{http::StatusCode, response::Json, extract::{State, Path, Query}};
+use axum::{
+    response::Json,
+    extract::{State, Path, Query, rejection::JsonRejection},
+};
 use axum_sessions::extractors::ReadableSession;
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
 use crate::schema::comments;
 use crate::utils;
-
 use crate::modules::{
+    request::utils as request_utils,
     response::{
-        models::{MessageResponse, ResponseResult},
+        models::ResponseResult,
         utils as response_utils,
     },
+    session::utils as session_utils,
     pagination::{
         models::Pagination,
         utils as pagination_utils,
@@ -22,18 +26,10 @@ use super::models::{Comment, NewComment};
 pub async fn create_comment(
     State(pool): State<Pool>,
     session: ReadableSession,
-    Json(new_comment): Json<NewComment>,
+    payload: Result<Json<NewComment>, JsonRejection>,
 ) -> ResponseResult<Comment> {
-    let user_email = session.get::<String>("user_email").unwrap();
-    if user_email.is_empty() {
-        let message = MessageResponse { message: "not found".to_string() };
-        return Err((StatusCode::NOT_FOUND, Json(message)));
-    }
-
-    if new_comment.content.is_empty() {
-        let message = MessageResponse { message: "content is empty".to_string() };
-        return Err((StatusCode::BAD_REQUEST, Json(message)));
-    }
+    session_utils::get_user_email(session).unwrap().0;
+    let new_comment = request_utils::parse_body(payload).unwrap().0;
 
     let conn = utils::pool::get_conn(pool).await?;
     let comment = conn.interact(|conn| {
@@ -50,9 +46,10 @@ pub async fn create_comment(
 
 pub async fn get_comment_list(
     State(pool): State<Pool>,
-    Path(post_id): Path<i32>,
+    Path(post_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
 ) -> ResponseResult<Pagination<Comment>> {
+    let post_id = request_utils::parse_path_param_i32(post_id).unwrap().0;
     let conn = utils::pool::get_conn(pool).await?;
 
     let total = conn.interact(move |conn|

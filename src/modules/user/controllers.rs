@@ -1,37 +1,31 @@
 use std::collections::HashMap;
-use axum::{http::StatusCode, response::Json, extract::{State, Query}};
+use axum::{response::Json, extract::{State, Query}};
 use axum_sessions::extractors::ReadableSession;
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
 use crate::schema::users;
 use crate::utils;
-
 use crate::modules::{
     response::{
-        models::{MessageResponse, ResponseResult},
+        models::ResponseResult,
         utils as response_utils,
     },
+    session::utils as session_utils,
     pagination::{
         models::Pagination,
         utils as pagination_utils,
     },
 };
-use super::{
-    models::{User, UserInfo},
-    utils as user_utils,
-};
+use super::{models::{User, UserInfo}, utils as user_utils};
 
 pub async fn get_user_list(
     State(pool): State<Pool>,
     Query(query): Query<HashMap<String, String>>,
     session: ReadableSession,
 ) -> ResponseResult<Pagination<UserInfo>> {
-    let is_admin = user_utils::is_admin(session);
-    if !is_admin {
-        let message = MessageResponse { message: "not found".to_string() };
-        return Err((StatusCode::NOT_FOUND, Json(message)));
-    }
+    // check if user is admin
+    session_utils::is_admin(session)?.0;
 
     let conn = utils::pool::get_conn(pool).await?;
 

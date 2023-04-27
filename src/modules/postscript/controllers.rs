@@ -1,16 +1,21 @@
-use axum::{http::StatusCode, response::Json, extract::{State, Path}};
+use axum::{
+    http::StatusCode,
+    response::Json,
+    extract::{State, Path, rejection::JsonRejection},
+};
 use axum_sessions::extractors::ReadableSession;
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
 use crate::schema::{posts, postscripts};
 use crate::utils;
-
 use crate::modules::{
+    request::utils as request_utils,
     response::{
         models::{MessageResponse, ResponseResult},
         utils as response_utils,
     },
+    session::utils as session_utils,
     post::models::Post,
 };
 use super::models::{Postscript, NewPostscript};
@@ -18,14 +23,12 @@ use super::models::{Postscript, NewPostscript};
 pub async fn create_postscript(
     State(pool): State<Pool>,
     session: ReadableSession,
-    Json(new_postscript): Json<NewPostscript>,
+    payload: Result<Json<NewPostscript>, JsonRejection>,
 ) -> ResponseResult<Postscript> {
-    let user_email = session.get::<String>("user_email").unwrap();
-    if user_email.is_empty() {
-        let message = MessageResponse { message: "Unauthorized".to_string() };
-        return Err((StatusCode::UNAUTHORIZED, Json(message)));
-    }
+    // check if user is logged in
+    session_utils::get_user_email(session)?.0;
 
+    let new_postscript = request_utils::parse_body(payload)?.0;
     if new_postscript.content.is_empty() {
         let message = MessageResponse { message: "content is empty".to_string() };
         return Err((StatusCode::BAD_REQUEST, Json(message)));
@@ -39,28 +42,21 @@ pub async fn create_postscript(
             .select(Post::as_select())
             .filter(posts::id.eq(new_postscript.post_id))
             .first(conn)
-    })
-        .await
-        .map_err(|e|
-            response_utils::bad_request_error(
-                e, Some("post not found".to_string()),
-            )
-        )?
-        .map_err(|e|
-            response_utils::bad_request_error(
-                e, Some("post not found".to_string()),
-            )
-        )?;
+    }).await
+        .map_err(|e| response_utils::bad_request_error(
+            e, Some("post not found".to_string()),
+        ))?
+        .map_err(|e| response_utils::bad_request_error(
+            e, Some("post not found".to_string()),
+        ))?;
 
     // create postscript
-    let postscript = conn
-        .interact(|conn| {
-            diesel::insert_into(postscripts::table)
-                .values(new_postscript)
-                .returning(Postscript::as_returning())
-                .get_result(conn)
-        })
-        .await
+    let postscript = conn.interact(move |conn| {
+        diesel::insert_into(postscripts::table)
+            .values(new_postscript)
+            .returning(Postscript::as_returning())
+            .get_result(conn)
+    }).await
         .map_err(|e| response_utils::internal_error(e, None))?
         .map_err(|e| response_utils::internal_error(e, None))?;
 
@@ -78,8 +74,7 @@ pub async fn get_postscript_list(
             .filter(postscripts::post_id.eq(post_id))
             .order(postscripts::created_at.desc())
             .load(conn)
-    )
-        .await
+    ).await
         .unwrap()
         .unwrap();
 
