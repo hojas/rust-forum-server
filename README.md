@@ -4,6 +4,7 @@ A light forum server built with axum, a Rust web framework.
 
 ## Features
 
+- Auth Module
 - User Module
 - Post Module
 - Postscript Module
