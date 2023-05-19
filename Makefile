@@ -19,3 +19,6 @@ migration_create_comments:
 run_migration:
 	diesel migration run
 	diesel migration redo
+
+build:
+	docker buildx build -t osx --platform=linux/amd64 --progress=plain --build-arg DISPLAY=$DISPLAY .
