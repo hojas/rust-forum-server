@@ -1,7 +1,8 @@
-CREATE TABLE postscripts
+CREATE TABLE posts
 (
     id         SERIAL PRIMARY KEY,
-    post_id    INTEGER   NOT NULL,
+    title      VARCHAR   NOT NULL,
     content    TEXT      NOT NULL,
+    author_id  INTEGER   NOT NULL REFERENCES users (id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 )

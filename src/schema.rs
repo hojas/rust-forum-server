@@ -31,15 +31,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    postscripts (id) {
-        id -> Int4,
-        post_id -> Int4,
-        content -> Text,
-        created_at -> Timestamp,
-    }
-}
-
-diesel::table! {
     users (id) {
         id -> Int4,
         email -> Varchar,
@@ -54,10 +45,15 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(collected_posts -> posts (post_id));
+diesel::joinable!(collected_posts -> users (user_id));
+diesel::joinable!(comments -> posts (post_id));
+diesel::joinable!(comments -> users (author_id));
+diesel::joinable!(posts -> users (author_id));
+
 diesel::allow_tables_to_appear_in_same_query!(
     collected_posts,
     comments,
     posts,
-    postscripts,
     users,
 );

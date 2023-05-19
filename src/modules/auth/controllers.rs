@@ -134,6 +134,8 @@ pub async fn login(
         ))?;
 
     return if auth_utils::verify_password(&user_login.password, &user.password) {
+        session.insert("user_id", &user.id)
+            .expect("failed to login");
         session.insert("user_email", &user.email)
             .expect("failed to login");
         session.insert("user_role", &user.role)

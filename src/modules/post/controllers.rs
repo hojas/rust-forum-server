@@ -8,7 +8,7 @@ use axum_sessions::extractors::ReadableSession;
 use diesel::prelude::*;
 use deadpool_diesel::postgres::Pool;
 
-use crate::schema::posts;
+use crate::schema::{posts, collected_posts};
 use crate::utils;
 use crate::modules::{
     request::utils as request_utils,
@@ -93,6 +93,92 @@ pub async fn get_post_list(
     let res: Vec<Post> = conn.interact(move |conn|
         posts::table
             .select(Post::as_select())
+            .order(posts::created_at.desc())
+            .offset((page_info.page - 1) * page_info.page_size)
+            .limit(page_info.page_size)
+            .load(conn)
+    ).await
+        .unwrap()
+        .unwrap();
+
+    let paged_res = Pagination {
+        total,
+        page: page_info.page,
+        page_size: page_info.page_size,
+        results: res,
+    };
+
+    Ok(Json(paged_res))
+}
+
+pub async fn get_post_list_by_author_id(
+    State(pool): State<Pool>,
+    Path(author_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> ResponseResult<Pagination<Post>> {
+    let author_id = request_utils::parse_path_param_i32(author_id).unwrap().0;
+    let conn = utils::pool::get_conn(pool).await?;
+
+    let total = conn.interact(move |conn|
+        posts::table
+            .filter(posts::author_id.eq(author_id))
+            .count()
+            .get_result(conn)
+    ).await
+        .map_err(|e| response_utils::internal_error(e, None))?
+        .map_err(|e| response_utils::internal_error(e, None))?;
+
+    let page_info = pagination_utils::get_page_info(query);
+
+    let res: Vec<Post> = conn.interact(move |conn|
+        posts::table
+            .select(Post::as_select())
+            .filter(posts::author_id.eq(author_id))
+            .order(posts::created_at.desc())
+            .offset((page_info.page - 1) * page_info.page_size)
+            .limit(page_info.page_size)
+            .load(conn)
+    ).await
+        .unwrap()
+        .unwrap();
+
+    let paged_res = Pagination {
+        total,
+        page: page_info.page,
+        page_size: page_info.page_size,
+        results: res,
+    };
+
+    Ok(Json(paged_res))
+}
+
+pub async fn get_post_list_by_collected(
+    State(pool): State<Pool>,
+    session: ReadableSession,
+    Query(query): Query<HashMap<String, String>>,
+) -> ResponseResult<Pagination<Post>> {
+    let conn = utils::pool::get_conn(pool).await?;
+
+    let user_id = session_utils::get_user_id(session)?.0;
+
+    let total = conn.interact(move |conn|
+        posts::table
+            .inner_join(collected_posts::table)
+            .select(posts::all_columns)
+            .filter(collected_posts::user_id.eq(user_id))
+            .count()
+            .get_result(conn)
+    ).await
+        .map_err(|e| response_utils::internal_error(e, None))?
+        .map_err(|e| response_utils::internal_error(e, None))?;
+
+    let page_info = pagination_utils::get_page_info(query);
+
+    let res: Vec<Post> = conn.interact(move |conn|
+        posts::table
+            .inner_join(collected_posts::table)
+            .select(posts::all_columns)
+            .filter(collected_posts::user_id.eq(user_id))
             .order(posts::created_at.desc())
             .offset((page_info.page - 1) * page_info.page_size)
             .limit(page_info.page_size)

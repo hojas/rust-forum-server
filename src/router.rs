@@ -14,12 +14,10 @@ pub fn routes(pool: Pool) -> Router {
 
     let post_routes = Router::new()
         .route("/", get(post::controllers::get_post_list))
+        .route("/author/:id/", get(post::controllers::get_post_list_by_author_id))
+        .route("/collected/", get(post::controllers::get_post_list_by_collected))
         .route("/", post(post::controllers::create_post))
         .route("/:id/", get(post::controllers::get_post));
-
-    let postscript_routes = Router::new()
-        .route("/", post(postscript::controllers::create_postscript))
-        .route("/", get(postscript::controllers::get_postscript_list));
 
     let comment_routes = Router::new()
         .route("/", post(comment::controllers::create_comment))
@@ -32,7 +30,6 @@ pub fn routes(pool: Pool) -> Router {
     let admin_user_routes = Router::new()
         .route("/user/", get(user::controllers::get_user_list))
         .route("/post/", get(post::controllers::get_post_list))
-        .route("/postscript/", get(postscript::controllers::get_postscript_list))
         .route("/comment/", get(comment::controllers::get_comment_list))
         .route("/collected_post/", get(collected_post::controllers::get_collected_post_list));
 
@@ -40,7 +37,6 @@ pub fn routes(pool: Pool) -> Router {
         .route("/", get(home::controllers::get_home))
         .nest("/auth/", auth_routes)
         .nest("/post/", post_routes)
-        .nest("/postscript/", postscript_routes)
         .nest("/comment/", comment_routes)
         .nest("/collected_post/", collected_post_routes)
         .nest("/admin/", admin_user_routes);

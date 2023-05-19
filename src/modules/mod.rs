@@ -6,6 +6,5 @@ pub mod home;
 pub mod auth;
 pub mod user;
 pub mod post;
-pub mod postscript;
 pub mod collected_post;
 pub mod comment;
