@@ -3,7 +3,7 @@ use axum_sessions::extractors::ReadableSession;
 use crate::modules::response::models::{MessageResponse, ResponseResult};
 
 pub fn get_user_id(session: ReadableSession) -> ResponseResult<i32> {
-    let user_id = session.get::<i32>("user_id").unwrap();
+    let user_id = session.get::<i32>("user_id").unwrap_or(0);
     if user_id == 0 {
         let message = MessageResponse { message: "unauthorized".to_string() };
         return Err((StatusCode::UNAUTHORIZED, Json(message)));
@@ -12,7 +12,7 @@ pub fn get_user_id(session: ReadableSession) -> ResponseResult<i32> {
 }
 
 pub fn get_user_email(session: ReadableSession) -> ResponseResult<String> {
-    let user_email = session.get::<String>("user_email").unwrap();
+    let user_email = session.get::<String>("user_email").unwrap_or("".to_string());
     if user_email.is_empty() {
         let message = MessageResponse { message: "unauthorized".to_string() };
         return Err((StatusCode::UNAUTHORIZED, Json(message)));
@@ -28,5 +28,5 @@ pub fn is_admin(session: ReadableSession) -> ResponseResult<bool> {
     } else {
         let message = MessageResponse { message: "not found".to_string() };
         Err((StatusCode::NOT_FOUND, Json(message)))
-    }
+    };
 }

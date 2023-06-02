@@ -21,15 +21,16 @@ use crate::modules::{
 };
 use super::{models::{UserRegister, UserLogin}, utils as auth_utils};
 
-async fn register_user(
+// 插入用户
+async fn insert_user(
     State(pool): State<Pool>,
     email: &str,
     password: &str,
-) -> ResponseResult<UserInfo> {
+) -> ResponseResult<User> {
     let conn = utils::pool::get_conn(pool).await?;
     let user = UserRegister {
         email: email.to_string(),
-        password: auth_utils::hash_password(&password.to_string()),
+        password: password.to_string(),
     };
 
     let user: User = conn.interact(move |conn| {
@@ -41,6 +42,26 @@ async fn register_user(
         .map_err(|e| response_utils::internal_error(e, None))?
         .map_err(|e| response_utils::internal_error(e, None))?;
 
+    Ok(Json(user))
+}
+
+// 注册用户
+async fn register_user(
+    State(pool): State<Pool>,
+    email: &str,
+    password: &str,
+) -> ResponseResult<UserInfo> {
+    let user = UserRegister {
+        email: email.to_string(),
+        password: auth_utils::hash_password(&password.to_string()),
+    };
+
+    let user = insert_user(
+        State(pool),
+        &user.email,
+        &user.password,
+    ).await?.0;
+
     let domain = std::env::var("DOMAIN").unwrap();
     let token = auth_utils::hash_password(&user.email);
     let verify_email_url = format!("https://{}/auth/verify_email?token={}", domain, token);
@@ -51,6 +72,7 @@ async fn register_user(
     Ok(Json(user_info))
 }
 
+// 注册用户
 pub async fn register(
     State(pool): State<Pool>,
     payload: Result<Json<UserLogin>, JsonRejection>,
@@ -95,6 +117,7 @@ pub async fn register(
     }
 }
 
+// 验证邮箱
 pub async fn verify_email(
     Query(query): Query<HashMap<String, String>>,
 ) -> ResponseResult<MessageResponse> {
@@ -110,6 +133,7 @@ pub async fn verify_email(
     }
 }
 
+// 登录
 pub async fn login(
     State(pool): State<Pool>,
     mut session: WritableSession,
@@ -117,9 +141,10 @@ pub async fn login(
 ) -> ResponseResult<UserInfo> {
     let user_login = request_utils::parse_body(payload)?;
     let message_str = "email or password not valid";
-    let conn = utils::pool::get_conn(pool).await?;
 
+    let conn = utils::pool::get_conn(pool).await?;
     let email = user_login.email.clone();
+
     let user = conn.interact(|conn|
         users::table
             .select(User::as_select())
@@ -149,11 +174,12 @@ pub async fn login(
     };
 }
 
+// 获取当前登录用户
 pub async fn get_user(
     State(pool): State<Pool>,
     session: ReadableSession,
 ) -> ResponseResult<UserInfo> {
-    let email = session_utils::get_user_email(session).unwrap().0;
+    let email = session_utils::get_user_email(session)?.0;
 
     if email.len() > 0 {
         let conn = utils::pool::get_conn(pool).await?;
@@ -174,6 +200,7 @@ pub async fn get_user(
     }
 }
 
+// 退出登录
 pub async fn logout(mut session: WritableSession) -> ResponseResult<MessageResponse> {
     session.destroy();
     let message = MessageResponse { message: "logout success".to_string() };
